@@ -1,0 +1,74 @@
+services:
+  db:
+    image: postgres:15-alpine
+    container_name: postgres_db
+    environment:
+      POSTGRES_USER: admin
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: db
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - saas_network
+
+  # Init-контейнер для исправления прав доступа
+  kafka-init:
+    image: alpine:latest
+    container_name: kafka-init
+    command: sh -c "chown -R 1000:1000 /var/lib/kafka/data && chmod -R 755 /var/lib/kafka/data"
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    # Этот контейнер выполнится один раз и завершится
+
+  kafka:
+    image: apache/kafka:3.7.0
+    container_name: kafka
+    depends_on:
+      kafka-init:
+        condition: service_completed_successfully
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+    volumes:
+      - kafka_data:/var/lib/kafka/data
+    networks:
+      - saas_network
+    restart: unless-stopped
+
+  app:
+    build: .
+    container_name: register-auth-service
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql+asyncpg://admin:password@db:5432/db
+      KAFKA_BOOTSTRAP_SERVERS: kafka:9092
+      JWT_SECRET_KEY: your-super-secret-key-change-this-in-production-123!
+      ALGORITHM: HS256
+      ACCESS_TOKEN_EXPIRE_MINUTES: 30
+    depends_on:
+      - db
+      - kafka
+    networks:
+      - saas_network
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  kafka_data:
+
+networks:
+  saas_network:
+    driver: bridge
