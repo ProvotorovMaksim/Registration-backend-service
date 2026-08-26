@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     JWT_SECRET_KEY: str = getenv("JWT_SECRET_KEY", "default_secret_key")
     ALGORITHM: str = getenv("ALGORITHM", "HS256")
 
-    class Config:
+    class Config: 
         env_file = ".env"
 
 settings = Settings()
