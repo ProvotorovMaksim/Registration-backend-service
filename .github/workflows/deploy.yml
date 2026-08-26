@@ -12,7 +12,19 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to Server via SSH
+      - name: Archive code
+        run: tar -czf code.tar.gz .
+
+      - name: Copy archive to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SSH_HOST }}
+          username: ${{ secrets.SSH_USER }}
+          key: ${{ secrets.SSH_KEY }}
+          source: "code.tar.gz"
+          target: ${{ secrets.PROJECT_PATH }}
+
+      - name: Deploy on server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -20,6 +32,7 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd ${{ secrets.PROJECT_PATH }}
-            git pull origin main
+            tar -xzf code.tar.gz
+            rm code.tar.gz
             docker compose up -d --build
             docker image prune -f
