@@ -2,7 +2,7 @@ from jose import jwt, JWTError
 from settings import settings
 from datetime import timedelta, datetime
 
-def create_access_token(data: dict, expires_delta: datetime = datetime.now() + timedelta(minutes=15)):
+def create_access_token(data: dict, expires_delta: datetime = datetime.utcnow() + timedelta(minutes=15)):
     to_encode = data.copy()
     to_encode.update({"exp": expires_delta})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.ALGORITHM)

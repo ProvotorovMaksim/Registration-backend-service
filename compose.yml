@@ -51,11 +51,11 @@ services:
     build: .
     container_name: register-auth-service
     ports:
-      - "8000:8000"
+      - "8007:8007"
     environment:
       DATABASE_URL: postgresql+asyncpg://admin:password@db:5432/db
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
-      JWT_SECRET_KEY: your-super-secret-key-change-this-in-production-123!
+      JWT_SECRET_KEY: AOJNFOADNLAKMFANKDFOnAOLNFALS<E23roj2nroWJNijbsdfojnsdlfno2jnfowjbndfiusb9fogbsdfnsldknf
       ALGORITHM: HS256
       ACCESS_TOKEN_EXPIRE_MINUTES: 30
     depends_on:
@@ -71,4 +71,4 @@ volumes:
 
 networks:
   saas_network:
-    driver: bridge
+    external: true

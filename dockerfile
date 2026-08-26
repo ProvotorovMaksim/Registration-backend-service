@@ -12,6 +12,6 @@ COPY entry.sh /entry.sh
 
 RUN chmod +x /entry.sh
 
-EXPOSE 8000
+EXPOSE 8007
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8007"]
