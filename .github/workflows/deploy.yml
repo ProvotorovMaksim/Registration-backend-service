@@ -13,7 +13,8 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Archive code
-        run: tar -czf code.tar.gz .
+        # ИСПРАВЛЕНО: исключаем сам архив и папку .git из архивации
+        run: tar --exclude='code.tar.gz' --exclude='.git' -czf code.tar.gz .
 
       - name: Copy archive to server
         uses: appleboy/scp-action@v0.1.7
