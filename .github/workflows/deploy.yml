@@ -12,20 +12,17 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Archive code
-        # ИСПРАВЛЕНО: исключаем сам архив и папку .git из архивации
-        run: tar --exclude='code.tar.gz' --exclude='.git' -czf code.tar.gz .
-
-      - name: Copy archive to server
-        uses: appleboy/scp-action@v0.1.7
+      - name: Sync files to server via rsync
+        uses: burnett01/rsync-deployments@7.0.1
         with:
-          host: ${{ secrets.SSH_HOST }}
-          username: ${{ secrets.SSH_USER }}
-          key: ${{ secrets.SSH_KEY }}
-          source: "code.tar.gz"
-          target: ${{ secrets.PROJECT_PATH }}
+          switches: -avzr --delete --exclude='.git/'
+          path: ./
+          remote_path: ${{ secrets.PROJECT_PATH }}
+          remote_host: ${{ secrets.SSH_HOST }}
+          remote_user: ${{ secrets.SSH_USER }}
+          remote_key: ${{ secrets.SSH_KEY }}
 
-      - name: Deploy on server
+      - name: Build and restart services
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SSH_HOST }}
@@ -33,7 +30,5 @@ jobs:
           key: ${{ secrets.SSH_KEY }}
           script: |
             cd ${{ secrets.PROJECT_PATH }}
-            tar -xzf code.tar.gz
-            rm code.tar.gz
             docker compose up -d --build
             docker image prune -f
