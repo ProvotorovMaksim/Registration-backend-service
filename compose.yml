@@ -51,7 +51,7 @@ services:
     build: .
     container_name: register-auth-service
     ports:
-      - "8007:8007"
+      - "8007:8001"
     environment:
       DATABASE_URL: postgresql+asyncpg://admin:password@db:5432/db
       KAFKA_BOOTSTRAP_SERVERS: kafka:9092
@@ -71,4 +71,5 @@ volumes:
 
 networks:
   saas_network:
+    driver: bridge
     external: true
