@@ -1,5 +1,6 @@
 from fastapi import FastAPI as App, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.exceptions import HTTPException
 from sqlalchemy import engine, select, update, delete, insert
 from Schemas import UserSchema, LoginRequest
 from logging import getLogger
@@ -36,10 +37,13 @@ async def register_user(user: UserSchema, db: AsyncSession = Depends(get_db)):
 async def login_user(login_request: LoginRequest, db: AsyncSession = Depends(get_db)):
     logger.info("Logging in user")
     produce_message("Login request received")    
-    response: dict = await match_user_data(login_request, db)
-    if response["Status"] == "Login failed":
-        return response
-    
+    try:
+        response: dict = await match_user_data(login_request, db)
+        if response["Status"] == "Login failed":
+            return response
+    except Exception as e:
+        raise HTTPException(401, "Неверный логин или пароль")
+
     logger.info(f"User {login_request.username} logged in successfully")
     access_token = create_access_token(data={"sub": login_request.username})
     return {"Status": "User logged in", "access_token": access_token, "token_type": "bearer"}

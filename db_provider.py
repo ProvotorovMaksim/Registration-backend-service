@@ -56,12 +56,10 @@ async def add_user_to_db(user: UserSchema, db: AsyncSession):
 
 async def match_user_data(login_request: LoginRequest, db: AsyncSession) -> dict:
     try:
-        result = await db.execute(select(User).where(User.username == login_request.username))
-        user = result.scalar_one_or_none()
+        # СТАЛО (правильно):
+        user = (await db.execute(select(User).where(User.username == login_request.username))).scalar_one_or_none()
         if user is None or not checkpw(login_request.password.encode('utf-8'), user.password.encode('utf-8')): # type: ignore
-            logger.warning(f"Login failed for user: {login_request.username}, {login_request.password} {user.password}") #type: ignore
-            print(f"Login failed for user: {login_request.username}, {login_request.password} {user.password}") #type: ignore
-            return {"Status": "Login failed"}
+            raise HTTPException(status_code=401, detail="Неверный логин или пароль")
         return {"Status": "Login successful"}
     except Exception as e:
         logger.error(f"Error matching user data: {e}")
