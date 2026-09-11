@@ -2,14 +2,16 @@ from fastapi import FastAPI as App, Depends
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.exceptions import HTTPException
 from sqlalchemy import engine, select, update, delete, insert
-from Schemas import UserSchema, LoginRequest
+from Schemas import UserSchema, LoginRequest, LoginResponse
 from logging import getLogger
 from kafkaproducer import produce_message
-from db_provider import get_db, User, add_user_to_db, match_user_data, Base
+from db_provider import get_db, User, add_user_to_db
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from bcrypt import hashpw, gensalt
 from settings import settings
 from my_token import create_access_token, verify_access_token
+from bcrypt import checkpw
+
 
 logger = getLogger("main")
 logger.setLevel("INFO")
@@ -33,30 +35,39 @@ async def register_user(user: UserSchema, db: AsyncSession = Depends(get_db)):
     logger.info(f"User {user.username} registered successfully")
     return {"Status": "User registered"}
 
-@app.post("/login")
+@app.post("/login", response_model=LoginResponse)
 async def login_user(login_request: LoginRequest, db: AsyncSession = Depends(get_db)):
     logger.info("Logging in user")
     produce_message("Login request received")    
     try:
-        response: dict = await match_user_data(login_request, db)
-        if response["Status"] == "Login failed":
-            return response
+        user = (await db.execute(select(User).where(User.username == login_request.username))).scalar_one_or_none()
+        if user is None or not checkpw(login_request.password.encode('utf-8'), user.password.encode('utf-8')): # type: ignore
+            raise HTTPException(status_code=401, detail="Неверный логин или пароль")
+        logger.info(f"User {login_request.username}:{user.id} logged in successfully")
+        access_token = create_access_token(data={"sub": str(user.id)})
+        responce = LoginResponse(
+            Status="User logged in",
+            access_token=access_token,
+            token_type="bearer"
+        )
+        return responce
     except Exception as e:
-        raise HTTPException(401, "Неверный логин или пароль")
-
-    logger.info(f"User {login_request.username} logged in successfully")
-    access_token = create_access_token(data={"sub": login_request.username})
-    return {"Status": "User logged in", "access_token": access_token, "token_type": "bearer"}
+        logger.error(f"Error matching user data: {e}")
+        raise HTTPException(status_code=500, detail="Internal Server Error")
 
 @app.get("/me")
 async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security), db: AsyncSession = Depends(get_db)): # type: ignore
     logger.info("Getting current user")
     payload = verify_access_token(credentials.credentials)
-    assert payload is not None
-    username = payload.get("sub")
-    if username is None:
+    if payload is None:
+        raise HTTPException(status_code=401, detail="Unauthorized!")
+    sub = payload.get("sub")
+    if sub is None:
+        raise HTTPException(status_code=401, detail="Token is invalid")
+    id = int(sub)
+    if id is None:
         return {"Status": "No username found in token"}
-    result = await db.execute(select(User).where(User.username == username))
+    result = await db.execute(select(User).where(User.id == id))
     user = result.scalar_one_or_none()
     if user is None:
         return {"Status": "User not found"}

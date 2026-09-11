@@ -2,24 +2,26 @@ import asyncio
 from logging.config import fileConfig
 from sqlalchemy import pool
 from sqlalchemy.engine import Connection
-from sqlalchemy.ext.asyncio import async_engine_from_config
+from sqlalchemy.ext.asyncio import create_async_engine
 from alembic import context
+from settings import settings
 
 # 1. Импортируем нашу Base и модели, чтобы Alembic знал о таблице users
-from db_provider import Base  
+from models import Base  
 
 config = context.config
 
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# 2. Передаем метаданные наших моделей в Alembic
 target_metadata = Base.metadata
 
+# Явно формируем URL из наших настроек
+db_url = f"{settings.DATABASE_DRIVER}://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.DATABASE_URL}/{settings.POSTGRES_DB}"
+
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
+        url=db_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -33,17 +35,13 @@ def do_run_migrations(connection: Connection) -> None:
         context.run_migrations()
 
 async def run_async_migrations() -> None:
-    connectable = async_engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    # Передаем db_url напрямую, игнорируя alembic.ini
+    connectable = create_async_engine(db_url, poolclass=pool.NullPool)
     async with connectable.connect() as connection:
         await connection.run_sync(do_run_migrations)
     await connectable.dispose()
 
 def run_migrations_online() -> None:
-    # Запускаем асинхронные миграции через asyncio
     asyncio.run(run_async_migrations())
 
 if context.is_offline_mode():

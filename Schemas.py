@@ -16,3 +16,8 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: Optional[str] = None
+
+class LoginResponse(BaseModel):
+    Status: str
+    access_token: str
+    token_type: str

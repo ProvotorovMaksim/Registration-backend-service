@@ -1,9 +1,9 @@
 from jose import jwt, JWTError
 from settings import settings
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, timezone
 
 def create_access_token(data: dict):
-    dtime: datetime = datetime.utcnow() + timedelta(hours=2)
+    dtime: datetime = datetime.now(timezone.utc) + timedelta(hours=2)
     to_encode = data.copy()
     to_encode.update({"exp": dtime})
     encoded_jwt = jwt.encode(to_encode, settings.JWT_SECRET_KEY, algorithm=settings.ALGORITHM)

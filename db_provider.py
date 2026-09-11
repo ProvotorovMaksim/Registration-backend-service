@@ -1,38 +1,30 @@
-from sqlalchemy import Column, Integer, String, ForeignKey, insert, update, delete, select
-from sqlalchemy.orm import DeclarativeBase, relationship
+from sqlalchemy import insert, update, delete, select
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
-from datetime import datetime
+from models import User
 from logging import getLogger
 from Schemas import UserSchema, LoginRequest
 from settings import settings
-from bcrypt import checkpw
 
 logger = getLogger("db_provider")
 logger.setLevel("INFO")
 
-class Base(DeclarativeBase):
-    pass
+async_engine = create_async_engine(
+    url = f"{settings.DATABASE_DRIVER}://{settings.POSTGRES_USER}:{settings.POSTGRES_PASSWORD}@{settings.DATABASE_URL}/{settings.POSTGRES_DB}",
+    pool_size=10,
+    max_overflow=5,
+    pool_timeout=10,
+    pool_recycle=1800,
+    pool_pre_ping=True,
+    echo=False
+)
 
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True)
-    username = Column(String)
-    email = Column(String, unique=True)
-    password = Column(String)
-    registered_at = Column(String, default=datetime.now().isoformat())
+# Фабрика асинхронных сессий
+async_session = async_sessionmaker(async_engine, class_=AsyncSession, expire_on_commit=False)
 
-sqlalchemy_url = settings.DATABASE_URL
-
-engine = create_async_engine(sqlalchemy_url, echo=True, future=True)
-
+# Для FastAPI (Dependency Injection)
 async def get_db():
-    from sqlalchemy.orm import sessionmaker
-    SessionLocal = async_sessionmaker(autocommit=False, autoflush=False, bind=engine)
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        await db.close()
+    async with async_session() as session:
+        yield session
 
 from sqlalchemy.exc import IntegrityError
 from fastapi import HTTPException
@@ -52,15 +44,3 @@ async def add_user_to_db(user: UserSchema, db: AsyncSession):
     except Exception as e:
         await db.rollback()
         raise e
-
-
-async def match_user_data(login_request: LoginRequest, db: AsyncSession) -> dict:
-    try:
-        # СТАЛО (правильно):
-        user = (await db.execute(select(User).where(User.username == login_request.username))).scalar_one_or_none()
-        if user is None or not checkpw(login_request.password.encode('utf-8'), user.password.encode('utf-8')): # type: ignore
-            raise HTTPException(status_code=401, detail="Неверный логин или пароль")
-        return {"Status": "Login successful"}
-    except Exception as e:
-        logger.error(f"Error matching user data: {e}")
-        raise HTTPException(status_code=500, detail="Internal Server Error")
